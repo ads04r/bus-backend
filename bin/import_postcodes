@@ -1,0 +1,46 @@
+#!/usr/bin/php -q
+<?php
+
+include_once(dirname(dirname(__file__)) . "/lib/bootstrap.php");
+
+include_once($lib_dir . "/arc2/ARC2.php");
+include_once($lib_dir . "/graphite/Graphite.php");
+
+$db = new mysqli($cfg['database']['host'], $cfg['database']['username'], $cfg['database']['password'], $cfg['database']['database']);
+$db->query("delete from postcodes;");
+
+$g = new Graphite();
+$g->load($var_dir . "/postcodes/counties.nt");
+
+$areas = array();
+foreach($g->allSubjects() as $postcode)
+{
+	$uri = "" . $postcode;
+	$area = strtolower(preg_replace("|^(.*)/([A-Z]+)([0-9])([A-Z0-9]+)$|", "$2", $uri));
+	if(in_array($area, $areas)) { continue; }
+
+	$areas[] = $area;
+}
+
+foreach($areas as $area)
+{
+	$file = $var_dir . "/postcodes/" . $area . "_position.nt";
+
+	$g = new Graphite();
+	$g->ns("geo", "http://www.w3.org/2003/01/geo/wgs84_pos#");
+	$g->load($file);
+
+	foreach($g->allSubjects() as $pc)
+	{
+		if(!($pc->has("geo:lat"))) { continue; }
+		if(!($pc->has("geo:long"))) { continue; }
+
+		$postcode = preg_replace("|^(.*)/([A-Za-z0-9]+)$|", "$2", "" . $pc);
+		$lat = (float) ("" . $pc->get("geo:lat"));
+		$lon = (float) ("" . $pc->get("geo:long"));
+
+		$query = "insert into postcodes (postcode, latitude, longitude) values ('" . $db->escape_string($postcode) . "', '" . $lat . "', '" . $lon . "');";
+		$db->query($query);
+	}
+
+}

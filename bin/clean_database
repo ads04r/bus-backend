@@ -1,0 +1,32 @@
+#!/usr/bin/php -q
+<?php
+
+include_once(dirname(dirname(__file__)) . "/lib/bootstrap.php");
+
+$db = new mysqli($cfg['database']['host'], $cfg['database']['username'], $cfg['database']['password'], $cfg['database']['database']);
+
+$db->query("DELETE FROM fhrsplaces;");
+$db->query("DELETE FROM journeypattern;");
+$db->query("DELETE FROM journeypatternsection;");
+$db->query("DELETE FROM journeypatterntiminglink;");
+$db->query("DELETE FROM journeyroutes;");
+$db->query("DELETE FROM journeyschedule;");
+$db->query("DELETE FROM `lines`;");
+$db->query("DELETE FROM localities;");
+$db->query("DELETE FROM operator;");
+$db->query("DELETE FROM organisations;");
+$db->query("DELETE FROM organisation_dates;");
+$db->query("DELETE FROM placestops;");
+$db->query("DELETE FROM `route`;");
+$db->query("DELETE FROM routelink;");
+$db->query("DELETE FROM routelocality;");
+$db->query("DELETE FROM routeschedule;");
+$db->query("DELETE FROM routesection;");
+$db->query("DELETE FROM schedule;");
+$db->query("DELETE FROM service;");
+$db->query("DELETE FROM stops;");
+$db->query("DELETE FROM vehiclejourney;");
+$db->query("DELETE FROM vehicleschedule;");
+$db->query("DELETE FROM postcodes;");
+$db->query("DELETE FROM postcodestops;");
+$db->query("DELETE FROM stoppolylinelink;");

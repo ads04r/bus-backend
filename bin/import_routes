@@ -1,0 +1,276 @@
+#!/usr/bin/php -q
+<?php
+
+include_once(dirname(dirname(__file__)) . "/lib/bootstrap.php");
+
+$config = json_decode(file_get_contents($etc_dir . "/config.json"), true);
+$valid_nocs = $config['operators'];
+if(!(is_array($valid_nocs))) { $valid_nocs = array(); }
+
+$db = new mysqli($cfg['database']['host'], $cfg['database']['username'], $cfg['database']['password'], $cfg['database']['database']);
+if ($handle = opendir($var_dir . "/tnds"))
+{
+	$db->query("delete from journeypattern;");
+	$db->query("delete from journeypatternsection;");
+	$db->query("delete from journeypatterntiminglink;");
+	$db->query("delete from `lines`;");
+	$db->query("delete from organisations;");
+	$db->query("delete from organisation_dates;");
+	$db->query("delete from route;");
+	$db->query("delete from routelink;");
+	$db->query("delete from routesection;");
+	$db->query("delete from service;");
+	$db->query("delete from vehiclejourney;");
+	$db->query("delete from journeyroutes;");
+	$db->query("delete from journeyschedule;");
+	$db->query("delete from operator;");
+	$db->query("delete from placestops;");
+	$db->query("delete from routelocality;");
+	$db->query("delete from routeschedule;");
+	$db->query("delete from schedule;");
+	$db->query("delete from service;");
+	$db->query("delete from vehicleschedule;");
+
+	while (false !== ($entry = readdir($handle)))
+	{
+		if(preg_match("/^(.*)\\.xml$/", $entry) == 0) { continue; }
+		$xml = simplexml_load_file($var_dir . "/tnds/" . $entry);
+		$nocs_ok = 0;
+
+		if(count($valid_nocs) == 0) { $nocs_ok = 1; }
+
+		foreach($xml->Operators->Operator as $operator)
+		{
+			$attr = $operator->attributes();
+			$id = "" . $attr['id'];
+			$noc = "" . $operator->NationalOperatorCode;
+			$oc = "" . $operator->OperatorCode;
+			$name = "" . $operator->OperatorShortName;
+			$licensename = "" . $operator->OperatorNameOnLicence;
+			$tradingname = "" . $operator->TradingName;
+
+			$query = "delete from operator where noc='" . $db->escape_string($noc) . "';";
+			$db->query($query);
+
+			$query = "insert ignore into operator (id, noc, oc, name, licensename, tradingname) values (";
+			$query .= "'" . $db->escape_string($id) . "',";
+			$query .= "'" . $db->escape_string($noc) . "',";
+			$query .= "'" . $db->escape_string($oc) . "',";
+			$query .= "'" . $db->escape_string($name) . "',";
+			$query .= "'" . $db->escape_string($licensename) . "',";
+			$query .= "'" . $db->escape_string($tradingname) . "');";
+
+			$db->query($query);
+
+			if(in_array($noc, $valid_nocs)) { $nocs_ok = 1; }
+		}
+
+		if($nocs_ok == 0) { continue; }
+		error_log($var_dir . "/tnds/" . $entry);
+
+		if($xml->ServicedOrganisations)
+		{
+			foreach($xml->ServicedOrganisations->ServicedOrganisation as $node)
+			{
+				$id = "" . $node->OrganisationCode;
+				$item = array();
+				$dates = array();
+				foreach($node->Holidays->DateRange as $datexml)
+				{
+					$dateitem = array();
+					$dateitem['description'] = "" . $datexml->Description;
+					$dateitem['start'] = strtotime($datexml->StartDate . " 00:00:00");
+					$dateitem['end'] = strtotime($datexml->EndDate . " 23:59:59");
+					$dates[] = $dateitem;
+				}
+				$item['id'] = $id;
+				$item['name'] = "" . $node->Name;
+				$item['dates'] = $dates;
+
+				$servicedorganisations[$id] = $item;
+
+				$query = "insert ignore into organisations (id, label) values ('" . $db->escape_string($item['id']) . "', '" . $db->escape_string($item['name']) . "');";
+				$db->query($query);
+
+				foreach($dates as $info)
+				{
+					$k = array(); $v = array();
+					$k[] = "organisation"; $v[] = $db->escape_string($item['id']);
+					$k[] = "description"; $v[] = $db->escape_string($info['description']);
+					$k[] = "start"; $v[] = gmdate("Y-m-d H:i:s", $info['start']);
+					$k[] = "end"; $v[] = gmdate("Y-m-d H:i:s", $info['end']);
+
+					$query = "insert ignore into organisation_dates (" . implode(", ", $k) . ") values ('" . implode("', '", $v) . "');";
+					$db->query($query);
+				}
+			}
+		}
+
+		$serviceprofiles = array();
+		foreach($xml->Services->Service as $s)
+		{
+			$id = $s->ServiceCode . "";
+			$serviceprofiles[$id] = $s->OperatingProfile;
+		}
+
+		foreach($xml->VehicleJourneys->VehicleJourney as $vj)
+		{
+			$id = "" . $vj->VehicleJourneyCode;
+			$time = "" . $vj->DepartureTime;
+			$service = "" . $vj->ServiceRef;
+			$pattern = "" . $vj->JourneyPatternRef;
+			$line = "" . $vj->LineRef;
+			if($vj->OperatingProfile)
+			{
+				$days = parse_days($vj->OperatingProfile);
+			} else {
+				$days = parse_days($serviceprofiles[$service]);
+			}
+
+			$query = "insert into vehiclejourney (id, departuretime, service, line, journeypattern, profile) values (";
+			$query .= "'" . $db->escape_string($id) . "',";
+			$query .= "'" . $db->escape_string($time) . "',";
+			$query .= "'" . $db->escape_string($service) . "',";
+			$query .= "'" . $db->escape_string($line) . "',";
+			$query .= "'" . $db->escape_string($pattern) . "',";
+			$query .= "'" . $db->escape_string(implode("\n", $days)) . "');";
+
+			$db->query($query);
+		}
+
+		foreach($xml->Services->Service as $s)
+		{
+			$id = $s->ServiceCode . "";
+			$lineinfo = $s->Lines->Line;
+			$lineattr = $lineinfo->attributes();
+			$lineid = $lineattr['id'];
+			$linename = $lineinfo->LineName . "";
+			$startdate = $s->OperatingPeriod->StartDate . "";
+			$enddate = $s->OperatingPeriod->EndDate . "";
+			$operator = $s->RegisteredOperatorRef . "";
+			$description = $s->Description . "";
+			$origin = $s->StandardService->Origin . "";
+			$destination = $s->StandardService->Destination . "";
+
+			$query = "insert into service (id, line, startdate, enddate, operator, description, origin, destination) values (";
+			$query .= "'" . $db->escape_string($id) . "',";
+			$query .= "'" . $db->escape_string($lineid) . "',";
+			$query .= "'" . $db->escape_string($startdate) . "',";
+			$query .= "'" . $db->escape_string($enddate) . "',";
+			$query .= "'" . $db->escape_string($operator) . "',";
+			$query .= "'" . $db->escape_string($description) . "',";
+			$query .= "'" . $db->escape_string($origin) . "',";
+			$query .= "'" . $db->escape_string($destination) . "');";
+
+			$db->query($query);
+
+			$query = "insert into `lines` (id, name, operator) values (";
+			$query .= "'" . $db->escape_string($lineid) . "',";
+			$query .= "'" . $db->escape_string($linename) . "',";
+			$query .= "'" . $db->escape_string($operator) . "');";
+
+			$db->query($query);
+
+			foreach($s->StandardService->JourneyPattern as $jp)
+			{
+				$attr = $jp->attributes();
+				$jp_id = "" . $attr['id'];
+				$direction = "" . $jp->Direction;
+				$route_ref = "" . $jp->RouteRef;
+				$jps_ref = "" . $jp->JourneyPatternSectionRefs;
+
+				$query = "insert ignore into journeypattern (id, direction, route, service) values (";
+				$query .= "'" . $db->escape_string($jp_id) . "',";
+				$query .= "'" . $db->escape_string($direction) . "',";
+				$query .= "'" . $db->escape_string($route_ref) . "',";
+				$query .= "'" . $db->escape_string($id) . "');";
+
+				$db->query($query);
+
+				$query = "insert ignore into journeypatternsection (id, journeypattern) values (";
+				$query .= "'" . $db->escape_string($jps_ref) . "',";
+				$query .= "'" . $db->escape_string($jp_id) . "');";
+
+				$db->query($query);
+			}
+		}
+
+		foreach($xml->JourneyPatternSections->JourneyPatternSection as $jps)
+		{
+			$attr = $jps->attributes();
+			$jps_id = $attr['id'];
+
+			foreach($jps->JourneyPatternTimingLink as $jpl)
+			{
+				$attr = $jpl->attributes();
+				$jpt_id = $attr['id'];
+
+				$jpl_from = $jpl->From;
+				$jpl_to = $jpl->To;
+				$attr = $jpl_from->attributes();
+				$from_seqno = $attr['SequenceNumber'];
+				$attr = $jpl_to->attributes();
+				$to_seqno = $attr['SequenceNumber'];
+
+				$query = "insert into journeypatterntiminglink (id, journeypatternsection, routelink, ";
+				$query .= "runtime, waittime, `from`, `to`, fromseq, toseq, fromactivity, fromtimingstatus, ";
+				$query .= "toactivity, totimingstatus) values (";
+
+				$query .= "'" . $db->escape_string($jpt_id) . "', ";
+				$query .= "'" . $db->escape_string($jps_id) . "', ";
+				$query .= "'" . $db->escape_string("" . $jpl->RouteLinkRef) . "', ";
+				$query .= "'" . $db->escape_string("" . parse_timespan("" . $jpl->RunTime)) . "', ";
+				$query .= "'" . $db->escape_string("" . parse_timespan("" . $jpl_to->WaitTime)) . "', ";
+				$query .= "'" . $db->escape_string("" . $jpl_from->StopPointRef) . "', ";
+				$query .= "'" . $db->escape_string("" . $jpl_to->StopPointRef) . "', ";
+				$query .= "'" . $db->escape_string("" . $from_seqno) . "', ";
+				$query .= "'" . $db->escape_string("" . $to_seqno) . "', ";
+				$query .= "'" . $db->escape_string("" . $jpl_from->Activity) . "', ";
+				$query .= "'" . $db->escape_string("" . $jpl_from->TimingStatus) . "', ";
+				$query .= "'" . $db->escape_string("" . $jpl_to->Activity) . "', ";
+				$query .= "'" . $db->escape_string("" . $jpl_to->TimingStatus) . "');";
+
+				$db->query($query);
+			}
+			
+		}
+
+		foreach($xml->Routes->Route as $route)
+		{
+			$attr = $route->attributes();
+			$id = $attr['id'];
+
+			$query = "insert into route (id, description) values ('" . $db->escape_string($id) . "', '" . $db->escape_string("" . $route->Description) . "');";
+			$db->query($query);
+
+			$query = "insert into routesection (id, route) values ('" . $db->escape_string("" . $route->RouteSectionRef) . "', '" . $db->escape_string($id) . "');";
+			$db->query($query);
+		}
+
+		foreach($xml->RouteSections->RouteSection as $rs)
+		{
+			$attr = $rs->attributes();
+			$rs_id = $attr['id'];
+
+			foreach($rs->RouteLink as $rl)
+			{
+				$attr = $rl->attributes();
+				$id = $attr['id'];
+				$dir = "" . $rl->Direction;
+				$from = "" . $rl->From->StopPointRef;
+				$to = "" . $rl->To->StopPointRef;
+
+				$query = "insert ignore into routelink (id, routesection, `from`, `to`, direction) values (";
+				$query .= "'" . $db->escape_string($id) . "', ";
+				$query .= "'" . $db->escape_string($rs_id) . "', ";
+				$query .= "'" . $db->escape_string($from) . "', ";
+				$query .= "'" . $db->escape_string($to) . "', ";
+				$query .= "'" . $db->escape_string($dir) . "');";
+
+				$db->query($query);
+			}
+		}
+	}
+	closedir($handle);
+}
+

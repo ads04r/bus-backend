@@ -1,0 +1,17 @@
+{
+   "lat" : 50.9386720402,
+   "stops" : [
+      "1980SN120045",
+      "1980SN120047",
+      "1980SN120046",
+      "1980SN120043",
+      "1980SN120050",
+      "1980SN120049",
+      "1980SN120048",
+      "1980SNA90935"
+   ],
+   "label" : "Lord's Hill",
+   "lon" : -1.4452684689,
+   "id" : "lordshill",
+   "uri" : "http://id.southampton.ac.uk/bus-area/lordshill"
+}

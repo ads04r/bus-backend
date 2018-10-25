@@ -1,0 +1,90 @@
+#!/usr/bin/php -q
+<?php
+
+$etc_dir = dirname(dirname(__file__)) . "/etc";
+$lib_dir = dirname(dirname(__file__)) . "/lib";
+$var_dir = dirname(dirname(__file__)) . "/var";
+$cfg = array();
+
+if ($dp = opendir($lib_dir))
+{
+	while ($entry = readdir($dp))
+	{
+		if(preg_match("/\\.php$/", $entry) == 0) { continue; }
+		$lib = $lib_dir . "/" . $entry;
+		include_once($lib);
+	}
+	closedir($dp);
+}
+if ($handle = opendir($etc_dir))
+{
+	while ($entry = readdir($handle))
+	{
+		$m = array();
+		if(preg_match("/^(.*)\\.json$/", $entry, $m) == 0) { continue; }
+		$cfg[$m[1]] = json_decode(file_get_contents($etc_dir . "/" . $entry), true);
+	}
+	closedir($handle);
+}
+
+$lats = $cfg['limits']['lat'];
+$lons = $cfg['limits']['lon'];
+sort($lats, SORT_NUMERIC); sort($lons, SORT_NUMERIC);
+$minlat = $lats[0];
+$minlon = $lons[0];
+$maxlat = $lats[(count($lats) - 1)];
+$maxlon = $lons[(count($lons) - 1)];
+
+$file = $var_dir . "/naptan/Stops.csv";
+if(count($argv) > 1)
+{
+	$file = $argv[1];
+}
+
+if(!(file_exists($file)))
+{
+	error_log("File not found.");
+	exit(1);
+}
+
+$lat_ix = 0; $lon_ix = 0;
+$fp = fopen($file, "r");
+$out = fopen("php://stdout", "w");
+$headers = fgetcsv($fp, ",");
+for($i = 0; $i < count($headers); $i++)
+{
+	if(strcmp(strtolower($headers[$i]), "latitude") == 0)
+	{
+		$lat_ix = $i;
+	}
+	if(strcmp(strtolower($headers[$i]), "longitude") == 0)
+	{
+		$lon_ix = $i;
+	}
+}
+
+if(($lat_ix == 0) | ($lon_ix == 0))
+{
+	error_log("Malformed NAPTAN Stops.csv file");
+	fclose($fp);
+	fclose($out);
+	exit(1);
+}
+
+fputcsv($out, $headers);
+
+while(false != ($row = fgetcsv($fp, ",")))
+{
+	$lat = $row[$lat_ix];
+	$lon = $row[$lon_ix];
+
+	if($lat < $minlat) { continue; }
+	if($lat > $maxlat) { continue; }
+	if($lon < $minlon) { continue; }
+	if($lon > $maxlon) { continue; }
+
+	fputcsv($out, $row);
+}
+
+fclose($fp);
+fclose($out);

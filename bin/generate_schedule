@@ -1,0 +1,152 @@
+#!/usr/bin/php -q
+<?php
+
+include_once(dirname(dirname(__file__)) . "/lib/bootstrap.php");
+
+$db = new mysqli($cfg['database']['host'], $cfg['database']['username'], $cfg['database']['password'], $cfg['database']['database']);
+
+// Clear old values
+$query = "delete from schedule;";
+$db->query($query);
+
+// Step 4 BEGIN
+
+error_log("Now generating stop schedule...\n");
+
+$routes = array();
+$routestops = array();
+$routejourneys = array();
+$routedescriptions = array();
+$routeinfo = array();
+
+$query = "select distinct routeid, direction, origin, destination, description, service_number from routeschedule,vehicleschedule where routeschedule.journeypattern=vehicleschedule.journeypattern;";
+$res = $db->query($query);
+while($row = $res->fetch_assoc())
+{
+	$id = $row['routeid'];
+	$routedescriptions[$id] = $row;
+}
+
+$query = "select distinct operator, service, routeid, name from routeschedule, operator where operator.noc=routeschedule.operator order by name, service;";
+$res = $db->query($query);
+while($row = $res->fetch_assoc())
+{
+	$id = $row['routeid'];
+	$routeinfo[$id] = $row;
+	$routes[] = $id;
+}
+
+$curservice = "";
+$jid = 0;
+$queries = array();
+foreach($routes as $routeid)
+{
+	$routejourneys = array();
+	$info = $routeinfo[$routeid];
+
+	$query = "select * from routeschedule where routeid='" . $db->escape_string($routeid) . "' and journeydate>=CURDATE() order by journeydate ASC;";
+	$res = $db->query($query);
+	error_log(" " . $info['name'] . " " . $info['service'] . "\t" . $res->num_rows . " journeys.");
+	while($row = $res->fetch_assoc())
+	{
+		$ds = $row['journeydate'];
+		$dt = strtotime($ds);
+		$date = date("Y-m-d", $dt);
+		$start_time = date("H:i:s", $dt);
+		$service = $row['operator'] . '/' . $row['service'] . '/' . $date;
+		$id = $service . '/' . date("Hi", $dt);
+		if(strcmp($service, $curservice) != 0)
+		{
+			$curservice = $service;
+			$jid = 1;
+		}
+
+		$item = array();
+		$item['id'] = $id;
+		$item['operator'] = $row['operator'];
+		$item['service'] = $row['service'];
+		$item['date'] = $dt;
+		$item['time'] = $start_time;
+		$item['journeyid'] = $jid;
+		$item['route'] = $routeid;
+		$item['journeypattern'] = $row['journeypattern'];
+		$routejourneys[] = $item;
+
+		$jid++;
+	}
+
+	$dt_now = strtotime(date("Y-m-d") . " 00:00:00");
+	foreach($routejourneys as $journey)
+	{
+		$dt = $journey['date'];
+		// if(($dt < $dt_now) | ($dt > ($dt_now + (86400 * 7)))) { continue; }
+
+		error_log("    " . $journey['id']);
+		$jp_id = $journey['journeypattern'];
+		$rt_id = $journey['route'];
+		$descriptions = $routedescriptions[$rt_id];
+		$query = "select * from journeyschedule where journeypattern='" . $db->escape_string($jp_id) . "' order by fromseq ASC, toseq ASC;";
+		$res = $db->query($query);
+		$i = 0;
+		while($row = $res->fetch_assoc())
+		{
+			if($i == 0)
+			{
+				$query = "(";
+				$query .= "'" . $db->escape_string($journey['service']) . "', ";
+				$query .= "'" . $db->escape_string($journey['operator']) . "', ";
+				$query .= "'" . $db->escape_string($row['from']) . "', ";
+				$query .= "'" . $db->escape_string(gmdate("Y-m-d H:i:s", $dt)) . "', ";
+				$query .= "'" . $db->escape_string($journey['id']) . "', ";
+				$query .= "'" . $db->escape_string($journey['route']) . "', ";
+				$query .= "'" . $db->escape_string($descriptions['destination']) . "', ";
+				$query .= "'" . $db->escape_string($descriptions['origin']) . "', ";
+				$query .= "'" . $db->escape_string($descriptions['description']) . "', ";
+				$query .= "'" . $db->escape_string($row['fromseq']) . "', ";
+				$query .= "'" . $db->escape_string($descriptions['direction']) . "', ";
+				$query .= "'" . $db->escape_string($journey['journeyid']) . "'";
+				$query .= ")";
+				$queries[] = $query;
+			}
+
+			$dt = $dt + ((int) $row['runtime']) + ((int) $row['waittime']);
+
+			$query = "(";
+			$query .= "'" . $db->escape_string($journey['service']) . "', ";
+			$query .= "'" . $db->escape_string($journey['operator']) . "', ";
+			$query .= "'" . $db->escape_string($row['to']) . "', ";
+			$query .= "'" . $db->escape_string(gmdate("Y-m-d H:i:s", $dt)) . "', ";
+			$query .= "'" . $db->escape_string($journey['id']) . "', ";
+			$query .= "'" . $db->escape_string($journey['route']) . "', ";
+			$query .= "'" . $db->escape_string($descriptions['destination']) . "', ";
+			$query .= "'" . $db->escape_string($descriptions['origin']) . "', ";
+			$query .= "'" . $db->escape_string($descriptions['description']) . "', ";
+			$query .= "'" . $db->escape_string($row['toseq']) . "', ";
+			$query .= "'" . $db->escape_string($descriptions['direction']) . "', ";
+			$query .= "'" . $db->escape_string($journey['journeyid']) . "'";
+			$query .= ")";
+			$queries[] = $query;
+
+			$i++;
+		}
+
+		if(count($queries) >= 10000)
+		{
+			$query = "insert ignore into schedule (";
+			$query .= "service, operator, stop_id, `date`, journey, route, destination, origin, description, sequence, direction, journey_number";
+			$query .= ") values " . implode(", ", $queries) . ";";
+			$db->query($query);
+			$queries = array();
+		}
+
+	}
+}
+
+if(count($queries) > 0)
+{
+	$query = "insert ignore into schedule (";
+	$query .= "service, operator, stop_id, `date`, journey, route, destination, origin, description, sequence, direction, journey_number";
+	$query .= ") values " . implode(", ", $queries) . ";";
+	$db->query($query);
+	$queries = array();
+}

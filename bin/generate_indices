@@ -1,0 +1,14 @@
+#!/usr/bin/php -q
+<?php
+
+include_once(dirname(dirname(__file__)) . "/lib/bootstrap.php");
+
+$db = new mysqli($cfg['database']['host'], $cfg['database']['username'], $cfg['database']['password'], $cfg['database']['database']);
+
+$db->query("delete from placestops;");
+$db->query("delete from postcodestops;");
+$db->query("delete from routelocality;");
+
+index_place_stops($db);
+index_postcode_stops($db);
+index_route_localities($db);

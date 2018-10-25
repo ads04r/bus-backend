@@ -1,0 +1,9 @@
+{
+    "id": "bevois",
+    "lat": 50.9165701955,
+    "lon": -1.39660418696,
+    "label": "Bevois Valley",
+    "uri": "http://id.southampton.ac.uk/bus-area/bevois",
+    "stops": ["1980SN120409","1980SN120410","1980SN120537","1980SN120538","1980SN120411"]
+
+}

@@ -1,0 +1,17 @@
+{
+   "databases" : {
+      "bus_prod_1" : {
+         "database" : "",
+         "password" : "",
+         "username" : "",
+         "host" : ""
+      },
+      "bus_prod_2" : {
+         "database" : "",
+         "password" : "",
+         "host" : "",
+         "username" : ""
+      }
+   },
+   "current" : "bus_prod_1"
+}

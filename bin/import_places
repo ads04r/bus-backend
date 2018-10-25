@@ -1,0 +1,49 @@
+#!/usr/bin/php -q
+<?php
+
+include_once(dirname(dirname(__file__)) . "/lib/bootstrap.php");
+
+$db = new mysqli($cfg['database']['host'], $cfg['database']['username'], $cfg['database']['password'], $cfg['database']['database']);
+if ($handle = opendir($var_dir . "/fhrs"))
+{
+	$db->query("delete from fhrsplaces;");
+
+	while (false !== ($entry = readdir($handle)))
+	{
+		if(preg_match("/^(.*)\\.xml$/", $entry) == 0) { continue; }
+		error_log($var_dir . "/fhrs/" . $entry);
+		$xml = simplexml_load_file($var_dir . "/fhrs/" . $entry);
+
+		foreach($xml->EstablishmentCollection->EstablishmentDetail as $place)
+		{
+			$id = $place->FHRSID . "";
+			$lat = (float) ("" . $place->Geocode->Latitude);
+			$lon = (float) ("" . $place->Geocode->Longitude);
+			$label = $place->BusinessName . "";
+			$types = explode("/", "" . $place->BusinessType);
+			$postcode = $place->PostCode . "";
+			$address = array();
+			$i = 1;
+			while(True)
+			{
+				$key = "AddressLine" . $i;
+				$val = @$place->$key . "";
+				if(strlen($val) == 0) { break; }
+				$address[] = $val;
+				$i++;
+			}
+
+			$query = "insert into fhrsplaces (id, label, postcode, latitude, longitude, address) values (";
+			$query .= "'" . $db->escape_string($id) . "',";
+			$query .= "'" . $db->escape_string($label) . "',";
+			$query .= "'" . $db->escape_string($postcode) . "',";
+			$query .= "'" . $db->escape_string($lat) . "',";
+			$query .= "'" . $db->escape_string($lon) . "',";
+			$query .= "'" . $db->escape_string(implode(", ", $address)) . "');";
+
+			$db->query($query);
+		}
+	}
+
+	closedir($handle);
+}

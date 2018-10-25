@@ -1,0 +1,53 @@
+#!/usr/bin/php -q
+<?php
+
+$etc_dir = dirname(dirname(__file__)) . "/etc";
+$lib_dir = dirname(dirname(__file__)) . "/lib";
+$var_dir = dirname(dirname(__file__)) . "/var";
+$cfg = array();
+if ($handle = opendir($lib_dir))
+{
+	while (false !== ($entry = readdir($handle)))
+	{
+		if(preg_match("/\\.php$/", $entry) == 0) { continue; }
+		$lib = $lib_dir . "/" . $entry;
+		include_once($lib);
+	}
+	closedir($handle);
+}
+if ($handle = opendir($etc_dir))
+{
+	while (false !== ($entry = readdir($handle)))
+	{
+		$m = array();
+		if(preg_match("/^(.*)\\.json$/", $entry, $m) == 0) { continue; }
+		$cfg[$m[1]] = json_decode(file_get_contents($etc_dir . "/" . $entry), true);
+	}
+	closedir($handle);
+}
+
+if((count($argv) > 1) & (array_key_exists("database", $cfg))) { $cfg['database']['database'] = $argv[1]; }
+
+$db = new mysqli($cfg['database']['host'], $cfg['database']['username'], $cfg['database']['password'], $cfg['database']['database']);
+
+// print(json_encode(get_polyline("1980SN120161", "1980HAA13381", $db)) . "\n");
+
+$services = array("U2", "U2B", "U2C", "U2X", "U1E", "U1A", "U1C", "U1", "U1W", "U6", "U6C", "U6H", "U9");
+$routes = array("7f3d6cf81e99cecacad9c4edb2ce020a");
+foreach($services as $service)
+{
+	$data = get_service_info($service, "UNIL", $db);
+	foreach($data['routes'] as $route)
+	{
+		$routes[] = $route['id'];
+	}
+}
+
+$ret = array();
+foreach($routes as $route)
+{
+	$points = get_route_polyline($route, $db);
+	$ret[$route] = $points;
+}
+
+print(json_encode($ret));

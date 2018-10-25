@@ -1,0 +1,111 @@
+#!/usr/bin/php -q
+<?php
+
+include_once(dirname(dirname(__file__)) . "/lib/bootstrap.php");
+
+$db = new mysqli($cfg['database']['host'], $cfg['database']['username'], $cfg['database']['password'], $cfg['database']['database']);
+
+// Step 2 BEGIN
+
+// Clear old values
+$query = "delete from vehicleschedule;";
+$db->query($query);
+$query = "delete from journeyschedule;";
+$db->query($query);
+$query = "delete from routeschedule;";
+$db->query($query);
+$query = "delete from journeyroutes;";
+$db->query($query);
+$query = "delete from schedule;";
+$db->query($query);
+
+$query = "insert into vehicleschedule (id, journeypattern, service_number, departuretime, direction, startdate, enddate, noc, operator, origin, destination, description, profile) select vehiclejourney.id, journeypattern.id as journeypattern, `lines`.name as service_number, vehiclejourney.departuretime, journeypattern.direction, service.startdate, service.enddate, operator.noc, operator.name as operator, service.origin, service.destination, route.description, vehiclejourney.profile from vehiclejourney,route,`lines`,journeypattern,service,operator where service.operator=operator.id and journeypattern.service=service.id and journeypattern.route=route.id and vehiclejourney.`line`=`lines`.id and vehiclejourney.journeypattern=journeypattern.id;";
+$db->query($query);
+
+$query = "insert ignore into journeyschedule (journeypattern, `from`, `to`, fromactivity, toactivity, fromtimingstatus, totimingstatus, runtime, waittime, fromseq, toseq) select journeypattern.id as journeypattern,journeypatterntiminglink.`from`,journeypatterntiminglink.`to`,fromactivity,toactivity,fromtimingstatus,totimingstatus,runtime,waittime,fromseq,toseq from journeypattern,journeypatternsection,route,routesection,routelink,journeypatterntiminglink where routelink.routesection=routesection.id and routesection.route=route.id and journeypattern.route=route.id and journeypatternsection.journeypattern=journeypattern.id and journeypatterntiminglink.journeypatternsection=journeypatternsection.id;";
+$db->query($query);
+
+$journeys = array();
+
+$query = "select distinct journeypattern.id,operator.noc as operator,direction,`lines`.name as service, route.description from journeypattern,`lines`,operator,service,route where service.line=`lines`.id and service.operator=operator.id and journeypattern.service=service.id and route.id=journeypattern.route;";
+
+$res = $db->query($query);
+while($row = $res->fetch_assoc())
+{
+	$journeys[] = $row;
+}
+
+foreach($journeys as $jp)
+{
+	$stops = array();
+	$query = "select * from journeyschedule where journeypattern='" . $db->escape_string($jp['id']) . "' order by fromseq ASC;";
+	$res = $db->query($query);
+	while($row = $res->fetch_assoc())
+	{
+		if(count($stops) == 0) { $stops[] = $row['from']; }
+		$stops[] = $row['to'];
+	}
+	$md5 = md5(implode(" ", $stops));
+
+	if(count($stops) == 0) { continue; }
+
+	$query = "insert into journeyroutes (journeypattern, routeid, `from`, `to`, routenumber, direction, operator, description) values ";
+	$query .= "('" . $db->escape_string($jp['id']) . "', '" . $db->escape_string($md5) ."', '" . $db->escape_string($stops[0]) . "', '" . $db->escape_string($stops[(count($stops) - 1)]) . "', '" . $db->escape_string($jp['service']) . "', '" . $db->escape_string($jp['direction']) . "', '" . $db->escape_string($jp['operator']) . "', '" . $db->escape_string($jp['description']) . "');";
+	$db->query($query);
+}
+
+if(function_exists("soton_extra"))
+{
+	soton_extra($db);
+}
+
+// Step 2.5 Get me my school holidays
+
+$query = "select organisation, DATE_FORMAT(start, '%Y-%m-%d') as start, DATE_FORMAT(end, '%Y-%m-%d') as end from organisation_dates;";
+$res = $db->query($query);
+$school_holidays = array();
+while($row = $res->fetch_assoc())
+{
+	$id = $row['organisation'];
+	$item = array();
+	if(array_key_exists($id, $school_holidays))
+	{
+		$item = $school_holidays[$id];
+	}
+	$data = array();
+	$data['start'] = $row['start'];
+	$data['end'] = $row['end'];
+	$item[] = $data;
+	$school_holidays[$id] = $item;
+}
+
+// Step 3 BEGIN
+
+$query = "select distinct journeyroutes.*,departuretime,startdate,enddate,profile from journeyroutes,vehicleschedule where enddate>=CURDATE() and journeyroutes.journeypattern=vehicleschedule.journeypattern";
+$res = $db->query($query);
+$dt_base = strtotime(date("Y-m-d") . " 00:00:00");
+$queries = array();
+while($row = $res->fetch_assoc())
+{
+	error_log($row['operator'] . " route " . $row['routenumber'] . " / " . $row['departuretime']);
+	$subquery = array();
+	foreach(get_days_of_operation(strtotime($row['startdate'] . " 00:00:00"), strtotime($row['enddate'] . " 23:59:59"), $cfg['bank_holidays'], $school_holidays, $row['profile']) as $dsd)
+	{
+		$ds = $dsd . " " . $row['departuretime'];
+		$squery = "(";
+		$squery .= "'" . $db->escape_string($row['journeypattern']) . "',";
+		$squery .= "'" . $db->escape_string($row['routeid']) . "',";
+		$squery .= "'" . $db->escape_string($row['operator']) . "',";
+		$squery .= "'" . $db->escape_string($row['routenumber']) . "',";
+		$squery .= "'" . $db->escape_string($ds) . "'";
+		$squery .= ")";
+		$subquery[] = $squery;
+	}
+	$query = "insert into routeschedule (journeypattern, routeid, operator, service, journeydate) values " . implode(", ", $subquery);
+	$queries[] = $query;
+}
+
+foreach($queries as $query)
+{
+	$db->query($query);
+}

@@ -1,0 +1,59 @@
+#!/usr/bin/php -q
+<?php
+
+$databases = array("bus_prod_1", "bus_prod_2");
+
+$etc_dir = dirname(dirname(__file__)) . "/etc";
+$lib_dir = dirname(dirname(__file__)) . "/lib";
+$var_dir = dirname(dirname(__file__)) . "/var";
+$cfg = array();
+if ($handle = opendir($etc_dir))
+{
+        while (false !== ($entry = readdir($handle)))
+        {
+                $m = array();
+                if(preg_match("/^(.*)\\.json$/", $entry, $m) == 0) { continue; }
+                $cfg[$m[1]] = json_decode(file_get_contents($etc_dir . "/" . $entry), true);
+        }
+        closedir($handle);
+}
+
+if(!(array_key_exists("database", $cfg)))
+{
+	error_log("Cannot find database configuration.");
+	exit(1);
+}
+
+$db = $cfg['database'];
+$cur_dbname = $db['current'];
+$seq = array_keys($db['databases']);
+sort($seq);
+$c = count($seq);
+$nx = array_search($cur_dbname, $seq);
+$next_dbname = $cur_dbname;
+$nx++;
+if($nx > ($c - 1)) { $nx = 0; }
+$next_dbname = $seq[$nx];
+
+$arg = "";
+if(count($argv) > 1) { $arg = trim($argv[1]); }
+
+if(strcmp($arg, "next") == 0)
+{
+	print($next_dbname);
+	exit();
+}
+
+if(!(in_array($arg, $seq)))
+{
+	print($cur_dbname);
+	exit(0);
+}
+
+$db['current'] = $arg;
+$db_file = $etc_dir . "/database.json";
+$fp = fopen($db_file, "w");
+fwrite($fp, json_encode($db));
+fclose($fp);
+
+print($arg);

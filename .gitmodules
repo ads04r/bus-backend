@@ -1,0 +1,15 @@
+[submodule "lib/valium"]
+	path = lib/valium
+	url = git@github.com:ads04r/valium.git
+[submodule "lib/parsedown"]
+	path = lib/parsedown
+	url = https://github.com/erusev/parsedown.git
+[submodule "lib/arc2"]
+	path = lib/arc2
+	url = https://github.com/semsol/arc2.git
+[submodule "lib/graphite"]
+	path = lib/graphite
+	url = https://github.com/cgutteridge/Graphite.git
+[submodule "lib/polyline-encoder"]
+	path = lib/polyline-encoder
+	url = https://github.com/emcconville/google-map-polyline-encoding-tool.git

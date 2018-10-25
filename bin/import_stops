@@ -1,0 +1,31 @@
+#!/usr/bin/php -q
+<?php
+
+include_once(dirname(dirname(__file__)) . "/lib/bootstrap.php");
+
+$lats = $cfg['limits']['lat'];
+$lons = $cfg['limits']['lon'];
+sort($lats, SORT_NUMERIC); sort($lons, SORT_NUMERIC);
+$minlat = $lats[0];
+$minlon = $lons[0];
+$maxlat = $lats[(count($lats) - 1)];
+$maxlon = $lons[(count($lons) - 1)];
+$stops_file = $var_dir . "/naptan/Stops.csv";
+
+if(!(file_exists($stops_file)))
+{
+	error_log("0 stops inserted - no Stops.csv file found");
+	exit(1);
+}
+if(filesize($stops_file) <= 3)
+{
+	error_log("0 stops inserted - empty Stops.csv file");
+	exit(1);
+}
+
+$db = new mysqli($cfg['database']['host'], $cfg['database']['username'], $cfg['database']['password'], $cfg['database']['database']);
+$db->query("delete from stops;");
+
+$stops = import_stops($stops_file, $db, $maxlat, $minlat, $maxlon, $minlon);
+
+error_log($stops . " stops inserted.");
