@@ -41,3 +41,5 @@ Links
   http://data.gov.uk/dataset/naptan
 * Food Standards Agency - Food Hygiene Ratings
   http://ratings.food.gov.uk/open-data/en-GB
+* Ordnance Survey - Code Point Open (Postcode data)
+  https://www.ordnancesurvey.co.uk/business-and-government/products/code-point-open.html
