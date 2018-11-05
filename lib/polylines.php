@@ -50,31 +50,36 @@ function get_polyline($from, $to, $db)
 	$f = get_stop_data($from, $db);
 	$t = get_stop_data($to, $db);
 
-	$url = str_replace("[from]", $f['latitude'] . "," . $f['longitude'], str_replace("[to]", $t['latitude'] . "," . $t['longitude'], $cfg['config']['route-api']));
+	$url = str_replace("[from]", $f['longitude'] . "," . $f['latitude'], str_replace("[to]", $t['longitude'] . "," . $t['latitude'], $cfg['config']['route-api']));
 	$data = json_decode(file_get_contents($url), true);
 
 	sleep(rand(2, 6));
 
 	if(!(is_array($data))) { return(array()); }
-	if(!(array_key_exists("status", $data))) { return(array()); }
-	if(strcmp($data['status'], "OK") != 0) { return(array()); }
+	if(!(array_key_exists("code", $data))) { return(array()); }
+	if(strcmp(strtoupper($data['code']), "OK") != 0) { return(array()); }
 
 	if(!(array_key_exists("routes", $data))) { return(array()); }
 	$routes = $data['routes'];
 	if(!(is_array($routes))) { return(array()); }
 	if(count($routes) == 0) { return(array()); }
 	$route = $routes[0];
-	if(!(array_key_exists("overview_polyline", $route))) { return(array()); }
-	$polyline = $route['overview_polyline'];
-	if(!(array_key_exists("points", $polyline))) { return(array()); }
+	$points = array();
+	foreach($route['legs'] as $leg)
+	{
+		foreach($leg['steps'] as $step)
+		{
+			$points = array_merge($points, $p->pair($p->decode($step['geometry'])));
+		}
+	}
+	$ret = $p->encode($points);
 
-	$ret = $polyline['points'];
 	if(strlen($ret) > 0)
 	{
 		$query = "insert ignore into stoppolylinelink (`from`, `to`, `polyline`) values ('" . $db->escape_string($from) . "', '" . $db->escape_string($to) . "', '" . $db->escape_string($ret) . "');";
 		$db->query($query);
 	}
 
-	return($p->pair($p->decode($ret)));
+	return($points);
 }
 

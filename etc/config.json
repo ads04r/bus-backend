@@ -1,3 +1,4 @@
 {
-	"operators":["BLUS","UNIL","FHAM","XLBL","WTSW"]
+	"operators":["BLUS","UNIL","FHAM","XLBL","WTSW"],
+	"route-api":"https://router.project-osrm.org/route/v1/driving/[from];[to]?overview=false&alternatives=true&steps=true&hints=;"
 }
