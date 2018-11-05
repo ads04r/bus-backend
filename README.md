@@ -6,7 +6,7 @@ Traveline National Data Set (TNDS) and import them into a MySQL database for
 easy querying, alongside the NaPTAN dataset. It then exposes them via a simple
 REST-style interface.
 
-/var needs to be populated with the data in raw form.
+./var needs to be populated with the data in raw form.
 
 Installing
 ----------
@@ -21,6 +21,7 @@ mkdir [directory]
 cd [directory]
 git clone git@github.com:ads04r/bus-backend.git .
 git submodule update --init --recursive
+mkdir ./var
 ```
 
 Then the 'go' script needs to be run weekly from cron.
