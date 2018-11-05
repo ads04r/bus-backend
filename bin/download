@@ -1,30 +1,30 @@
 #!/bin/bash
 
 BASE_DIR=`dirname "$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"`
-TMP_DIR=/tmp/bus
 
-mkdir $TMP_DIR
-mkdir $TMP_DIR/var
-mkdir $TMP_DIR/var/tnds
-mkdir $TMP_DIR/var/naptan
-mkdir $TMP_DIR/var/fhrs
-mkdir $TMP_DIR/var/postcodes
+mkdir $BASE_DIR/var
+cd $BASE_DIR/var
+rm -Rf *
+mkdir $BASE_DIR/var/tnds
+mkdir $BASE_DIR/var/naptan
+mkdir $BASE_DIR/var/fhrs
+mkdir $BASE_DIR/var/postcodes
 
 lftp -f $BASE_DIR/etc/download.lftp
-cd $TMP_DIR/var/tnds
-unzip /tmp/SW.zip
-rm /tmp/SW.zip
+cd $BASE_DIR/var/tnds
+unzip $BASE_DIR/var/SW.zip
+rm $BASE_DIR/var/SW.zip
 
-cd $TMP_DIR/var/naptan
-wget -O /tmp/naptan.zip "http://www.dft.gov.uk/NaPTAN/snapshot/NaPTANcsv.zip"
-unzip /tmp/naptan.zip
-rm /tmp/naptan.zip
+cd $BASE_DIR/var/naptan
+wget -O $BASE_DIR/var/naptan.zip "http://www.dft.gov.uk/NaPTAN/snapshot/NaPTANcsv.zip"
+unzip $BASE_DIR/var/naptan.zip
+rm $BASE_DIR/var/naptan.zip
 
-cd $TMP_DIR/var/naptan
+cd $BASE_DIR/var/naptan
 mv Stops.csv Stops.all.csv
 $BASE_DIR/bin/prune_stops ./Stops.all.csv > ./Stops.csv
 
-cd $TMP_DIR/var/fhrs
+cd $BASE_DIR/var/fhrs
 rm *.xml
 ## Southampton, Portsmouth and Winchester
 wget "http://ratings.food.gov.uk/OpenDataFiles/FHRS877en-GB.xml"
@@ -43,12 +43,10 @@ wget "http://ratings.food.gov.uk/OpenDataFiles/FHRS143en-GB.xml"
 wget "http://ratings.food.gov.uk/OpenDataFiles/FHRS315en-GB.xml"
 ##
 
-cd $TMP_DIR/var/postcodes
+cd $BASE_DIR/var/postcodes
 rm *.nt
 wget "http://download.data.ordnancesurvey.co.uk/code-point-open/codepoint.zip"
 unzip codepoint.zip *_counties.nt *_position.nt
 rm codepoint.zip
 cat *_counties.nt | grep http://data.ordnancesurvey.co.uk/id/7000000000017765 > counties.nt
 rm `find | grep 'nt$' | grep -v '_position\.nt$' | grep -v '^\./counties'`
-
-

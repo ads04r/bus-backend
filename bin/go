@@ -2,14 +2,12 @@
 
 BASE_DIR=`dirname "$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"`
 NX=`bin/switch next`
-TMP_DIR=/tmp/bus
 
-mkdir $TMP_DIR
-mkdir $TMP_DIR/var
-mkdir $TMP_DIR/var/tnds
-mkdir $TMP_DIR/var/naptan
-mkdir $TMP_DIR/var/fhrs
-mkdir $TMP_DIR/var/postcodes
+mkdir $BASE_DIR/var
+mkdir $BASE_DIR/var/tnds
+mkdir $BASE_DIR/var/naptan
+mkdir $BASE_DIR/var/fhrs
+mkdir $BASE_DIR/var/postcodes
 
 echo "Downloading data to var at " `date +%H:%M`
 cd "$BASE_DIR"
@@ -42,11 +40,3 @@ bin/generate_indices $NX 2>> var/stderr.txt
 bin/switch $NX > /dev/null
 
 echo "Import completed at" `date +%H:%M`
-
-cd etc
-smbclient -A ~/var/.smb //srv01728.soton.ac.uk/api.bus.dev.southampton.ac.uk/ -c "cd repo/etc; put database.json" 2> /dev/null
-
-echo "Upload completed at" `date +%H:%M`
-
-cd /tmp
-rm -Rf bus

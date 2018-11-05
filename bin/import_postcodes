@@ -1,6 +1,8 @@
 #!/usr/bin/php -q
 <?php
 
+ini_set('memory_limit', '256M');
+
 include_once(dirname(dirname(__file__)) . "/lib/bootstrap.php");
 
 include_once($lib_dir . "/arc2/ARC2.php");
@@ -25,6 +27,7 @@ foreach($g->allSubjects() as $postcode)
 foreach($areas as $area)
 {
 	$file = $var_dir . "/postcodes/" . $area . "_position.nt";
+	error_log($area);
 
 	$g = new Graphite();
 	$g->ns("geo", "http://www.w3.org/2003/01/geo/wgs84_pos#");
