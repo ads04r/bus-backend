@@ -1,5 +1,7 @@
 <?php
 
+date_default_timezone_set("Europe/London");
+
 $etc_dir = dirname(dirname(__file__)) . "/etc";
 $lib_dir = dirname(dirname(__file__)) . "/lib";
 $var_dir = dirname(dirname(__file__)) . "/var";

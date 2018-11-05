@@ -33,6 +33,7 @@ function get_postcode($postcode, $db)
 function get_postcode_stops($postcode, $db)
 {
         $query = "select * from postcodestops,stops where stopid=atcocode and postcode='" . preg_replace("/[^A-Z0-9]/", "", strtoupper($postcode)) . "' order by distance ASC;";
+
         $res = $db->query($query);
         $ret = array();
         while($row = $res->fetch_assoc())
@@ -43,6 +44,7 @@ function get_postcode_stops($postcode, $db)
 		$item['distance'] = (int) $row['distance'];
 		$ret[] = $item;
         }
+
         return($ret);
 }
 

@@ -1,17 +1,18 @@
-api.bus.southampton.ac.uk
-=========================
+Hampshire Bus API
+=================
 
-*Ash Smith, Open Data Service, TIDT, iSolutions*
+*Ash Smith*
 
 A RESTful API for getting realtime bus schedules, as well as information on the
-bus routes and operators within Southampton.
+bus routes and operators within Southampton and Hampshire.
 
-bus.soton
----------
-If you just want bus times, try http://bus.southampton.ac.uk for a service that
+bus.flarpyland
+--------------
+If you just want bus times, try http://bus.flarpyland.com for a service that
 makes use of this API to provide bus times for everyone, not just programmers.
 This service also has times and information in other formats other than JSON.
-It's run by the University of Southampton's Open Data Service.
+It's a fork of bus.soton, which I wrote when I worked for the University of
+Southampton.
 
 API Documentation
 =================
@@ -263,11 +264,73 @@ To dump the nearest ten stops to a postcode
     /postcode/[POSTCODE]/stops
 
 
+Searching
+---------
+
+Searching is still a work in progress. There is currently no reliable way to
+determine a route between two places, but finding a place from a string search
+is possible. This is done using the /resolve endpoint, called with a POST
+request.
+
+    curl --header "Content-Type: application/json" \
+         --request POST \
+         --data '{"type":"","search":"Archers"}' \
+         https://api.bus.flarpyland.com/resolve
+
+This example will return something like...
+
+	[
+	   {
+		  "query" : "1980SN120405",
+		  "label" : "Archers Road",
+		  "type" : "stop-area",
+		  "result" : [
+			 "1980SN120405",
+			 "1980SN120406",
+			 "1980SN120535",
+			 "1980SN120402",
+			 "1980SN120536",
+			 "1980SN120404",
+			 "1980SN120891",
+			 "1980SN120510",
+			 "1980SNA90894",
+			 "1980SN120403",
+			 "1980SN120401",
+			 "1980SN120407"
+		  ]
+	   },
+	   {
+		  "query" : "1980SN120394",
+		  "label" : "Archers Road",
+		  "type" : "stop",
+		  "result" : [
+			 "1980SN120394",
+			 "1980SNA90918",
+			 "1980SN120504",
+			 "1980SN120506",
+			 "1980SN120505",
+			 "1980SN120507",
+			 "1980SNA90920",
+			 "1980SNA90919",
+			 "1980SN120396",
+			 "1980SN120395"
+		  ]
+	   }
+	]
+
+Each search result has a query, a label, a type and a result. The query is
+basically the ID of the returned item (the 'query' label is legacy,
+unfortunately) and the 'result' field is an array of stop IDs. If the type
+of the result is a stop, then these are redundant.
+
+Types of returned result can be stop, stop-area, fhrs, postcode or street.
+
+
 Dumps
 -----
 
-The dumps are primarily for data.soton, but anyone is free to use them. They
-are simply JSON files containing lists and basic data on the routes,
+This refers to data dumps, not actual dumps to which one might catch a bus :)
+They are simply JSON files containing lists and basic data on the routes,
 operators and stops within this data. It's a good place to get some IDs
 for testing purposes, too.
 

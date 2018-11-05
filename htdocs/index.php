@@ -295,7 +295,7 @@ $v->route("|/dump/([a-z]+)$|", function($m, $get, $post) use (&$db)
 	return(array());
 });
 
-$v->route("|/|", function($m, $get, $post)
+$v->route("|^/$|", function($m, $get, $post)
 {
 	$doc_dir = dirname(dirname(__file__)) . "/doc";
 	$etc_dir = dirname(dirname(__file__)) . "/etc";

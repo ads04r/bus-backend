@@ -101,7 +101,12 @@ function text_search($search, $db)
 	if(preg_match("/^([a-zA-Z0-9 ]+)$/", $search) > 0)
 	{
 		$item = resolve_stops($search, "postcode", $db);
-		if(count($item['result']) > 0) { $ret = array_merge($ret, array($item)); }
+		if(count($item) > 0) {
+			if(count($item[0]['result']) > 0)
+			{
+				$ret = array_merge($ret, $item);
+			}
+		}
 	}
 	if(preg_match("/^([0-9\\.\\-]+),([0-9\\.\\-]+)$/", str_replace(" ", "", $search)) > 0)
 	{
