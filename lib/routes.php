@@ -87,17 +87,17 @@ function get_service_info($service, $noc, $db)
 		$operator = $row;
 	}
 
-	$query = "select distinct routeid, description from journeyroutes where operator='" . $db->escape_string($noc) . "' and routenumber='" . $db->escape_string($service) . "' order by description ASC;";
+	$query = "select distinct routeid, description, direction from journeyroutes where operator='" . $db->escape_string($noc) . "' and routenumber='" . $db->escape_string($service) . "' order by description ASC;";
 	$res = $db->query($query);
 	while($row = $res->fetch_assoc())
 	{
 		$item = array();
 		$item['id'] = $row['routeid'];
 		$item['label'] = $row['description'];
+		$item['direction'] = $row['direction'];
 		$routes[] = $item;
 	}
 
-	$query = "select vehicleschedule.description from routeschedule,vehicleschedule where routeschedule.journeypattern=vehicleschedule.journeypattern and routeschedule.operator='" . $db->escape_string($noc) . "' and routeschedule.service='" . $db->escape_string($service) . "' limit 0,1;";
 	$query = "select distinct journeyroutes.routeid, service.description from journeyroutes, journeypattern, service where journeyroutes.journeypattern=journeypattern.id and journeypattern.service=service.id and journeyroutes.operator='" . $db->escape_string($noc) . "' and journeyroutes.routenumber='" . $db->escape_string($service) . "' order by description ASC;";
 	$res = $db->query($query);
 	while($row = $res->fetch_assoc())
@@ -124,12 +124,14 @@ function get_service_stops($service, $noc, $direction, $db)
 {
 	$dt = time();
 	$ret = array();
-	$query = "select stop_id, AVG(sequence) as sequence, GROUP_CONCAT(DISTINCT route ORDER BY route ASC SEPARATOR ' ') as routes from schedule where direction='" . $db->escape_string($direction) . "' and operator='" . $db->escape_string($noc) . "' and service='" . $db->escape_string($service) . "' and `date`>'" . date("Y-m-d", $dt) . " 04:00:00' and `date`<'" . date("Y-m-d", ($dt + 86400)) . " 05:00:00' group by stop_id;";
+	$query = "select stop_id, AVG(sequence) as sequence, GROUP_CONCAT(DISTINCT route ORDER BY route ASC SEPARATOR ' ') as routes from schedule where direction='" . $db->escape_string($direction) . "' and operator='" . $db->escape_string($noc) . "' and service='" . $db->escape_string($service) . "' and `date`>'" . date("Y-m-d", $dt) . " 04:00:00' and `date`<'" . date("Y-m-d", ($dt + 86400)) . " 05:00:00' group by stop_id";
+	$query = "select sch.*, stops.commonname as label from (" . $query . ") as sch, stops where stops.atcocode=stop_id;";
 	$res = $db->query($query);
 	while($row = $res->fetch_assoc())
 	{
 		$item = array();
 		$item['id'] = $row['stop_id'];
+		$item['label'] = $row['label'];
 		$item['routes'] = explode(" ", $row['routes']);
 		$item['sequence'] = (int) $row['sequence'];
 		$ret[] = $item;
