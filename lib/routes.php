@@ -78,6 +78,7 @@ function get_service_info($service, $noc, $db)
 {
 	$ret = array();
 	$routes = array();
+	$directions = array();
 	$operator = array("noc" => $noc);
 	$query = "select id, noc, name from operator where noc='" . $db->escape_string($noc) . "';";
 	$res = $db->query($query);
@@ -97,15 +98,24 @@ function get_service_info($service, $noc, $db)
 	}
 
 	$query = "select vehicleschedule.description from routeschedule,vehicleschedule where routeschedule.journeypattern=vehicleschedule.journeypattern and routeschedule.operator='" . $db->escape_string($noc) . "' and routeschedule.service='" . $db->escape_string($service) . "' limit 0,1;";
+	$query = "select distinct journeyroutes.routeid, service.description from journeyroutes, journeypattern, service where journeyroutes.journeypattern=journeypattern.id and journeypattern.service=service.id and journeyroutes.operator='" . $db->escape_string($noc) . "' and journeyroutes.routenumber='" . $db->escape_string($service) . "' order by description ASC;";
 	$res = $db->query($query);
 	while($row = $res->fetch_assoc())
 	{
 		$ret['label'] = $row['description'];
 	}
 
+	$query = "select distinct direction from schedule where operator='" . $db->escape_string($noc) . "' and service='" . $db->escape_string($service) . "' order by direction ASC;";
+	$res = $db->query($query);
+	while($row = $res->fetch_assoc())
+	{
+		$directions[] = $row['direction'];
+	}
+
 	if(array_key_exists("id", $operator)) { unset($operator['id']); }
 	$ret['operator'] = $operator;
 	$ret['routes'] = $routes;
+	$ret['directions'] = $directions;
 	if(count($ret) > 0) { $ret['id'] = $service; }
 	return($ret);
 }
@@ -114,30 +124,23 @@ function get_service_stops($service, $noc, $direction, $db)
 {
 	$dt = time();
 	$ret = array();
-	$query = "select distinct stop_id from schedule where direction='" . $db->escape_string($direction) . "' and operator='" . $db->escape_string($noc) . "' and service='" . $db->escape_string($service) . "' and `date`>'" . date("Y-m-d", $dt) . " 04:00:00' and `date`<'" . date("Y-m-d", ($dt + 86400)) . " 05:00:00';";
+	$query = "select stop_id, AVG(sequence) as sequence, GROUP_CONCAT(DISTINCT route ORDER BY route ASC SEPARATOR ' ') as routes from schedule where direction='" . $db->escape_string($direction) . "' and operator='" . $db->escape_string($noc) . "' and service='" . $db->escape_string($service) . "' and `date`>'" . date("Y-m-d", $dt) . " 04:00:00' and `date`<'" . date("Y-m-d", ($dt + 86400)) . " 05:00:00' group by stop_id;";
 	$res = $db->query($query);
 	while($row = $res->fetch_assoc())
 	{
-		$ret[] = $row['stop_id'];
+		$item = array();
+		$item['id'] = $row['stop_id'];
+		$item['routes'] = explode(" ", $row['routes']);
+		$item['sequence'] = (int) $row['sequence'];
+		$ret[] = $item;
 	}
-
 	usort($ret, function($a, $b)
 	{
-		global $db, $direction;
-		
-		$res = $db->query("select * from routelink where direction='" . $db->escape_string($direction) . "' and `from`='" . $db->escape_string($a) . "' and `to`='" . $db->escape_string($b) . "'");
-		$aa = $res->num_rows;
-		$res->free();
-
-		$res = $db->query("select * from routelink where direction='" . $db->escape_string($direction) . "' and `from`='" . $db->escape_string($b) . "' and `to`='" . $db->escape_string($a) . "'");
-		$bb = $res->num_rows;
-		$res->free();
-		
-		if($aa < $bb) { return -1; }
-		if($aa > $bb) { return 1; }
+		if($a['sequence'] < $b['sequence']) { return -1; }
+		if($a['sequence'] > $b['sequence']) { return 1; }
 		return 0;
 	});
-	
+
 	return($ret);
 }
 

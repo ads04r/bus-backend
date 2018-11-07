@@ -156,12 +156,22 @@ route at different times of day, and obviously has an inverse route, from
 Winchester to Southampton. However these are all the same 'service'.
 
 To get general information about a service, including all the routes it
-takes
+takes and how many variations ('directions') it has
 
     /service/[NOC]/[Service_ID]
 
 Where [NOC] is the national operator code of the bus operator and [ID] is the
 number on the front of the bus.
+
+To get a list of all the stops served by a service, and which routes serve
+these stops
+
+    /service/[NOC]/[Service_ID]/[Direction]/stops
+
+This will attempt to order the stops sequentially, although this is not
+always possible (eg when two routes on the same service serve the same two
+stops but in a different order) and should not be relied upon.
+
 
 Routes
 ------
